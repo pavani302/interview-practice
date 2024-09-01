@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: httpbin-deployment
+  namespace: pavani-ns
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: httpbin-app
+  template:
+    metadata:
+      labels:
+        app: httpbin-app
+    spec:
+      containers:
+      - name: httpbin-container
+        image: kennethreitz/httpbin
+        ports:
+        - containerPort: 80
