@@ -1,0 +1,68 @@
+name: Manual Deployment Workflow
+
+# Trigger the workflow manually using the "workflow_dispatch" event.
+on:
+  workflow_dispatch:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    name: Integration Job
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '14'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run tests
+      run: npm test
+
+    - name: Build project
+      run: npm run build
+
+    - name: Build Docker image
+      run: |
+        docker build -t my-app:${{ github.sha }} .
+      # Using the short SHA of the commit as the Docker image tag for uniqueness.
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+    - name: Push Docker image to Docker Hub
+      run: |
+        docker push my-app:${{ github.sha }}
+
+  deployment:
+    runs-on: ubuntu-latest
+    needs: integration
+    name: Deployment Job
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+
+    - name: Deploy to Kubernetes
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+      run: |
+        echo "$KUBE_CONFIG_DATA" | base64 --decode > $HOME/.kube/config
+
+        kubectl apply -f deployment.yaml
+        # Assuming deployment.yaml is the Kubernetes manifest file in the repository
+        kubectl set image deployment/my-deployment my-container=my-app:${{ github.sha }}
+        # Updates the deployment with the new Docker image
